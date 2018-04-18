@@ -39,7 +39,6 @@ func writestatus(cronjobs map[string]int) {
 			fmt.Printf("\nLength: %d bytes", len)
 		}
 	}
-
 }
 
 func miniGrep(path string, searchtext string) (int, error) {

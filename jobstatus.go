@@ -1,9 +1,12 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"log"
 	"os"
+	"regexp"
+	"time"
 )
 
 //
@@ -40,6 +43,30 @@ func writestatus(cronjobs map[string]int) {
 
 }
 
+func miniGrep(path string, searchtext string) (int, error) {
+	returncode := 0
+	file, err := os.Open(path)
+	if err != nil {
+		return 0, err
+	}
+	defer file.Close()
+
+	var lines []string
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		lines = append(lines, scanner.Text())
+	}
+	re := regexp.MustCompile(searchtext)
+	for _, regel := range lines {
+		match := re.FindString(regel)
+		// fmt.Println("Regel is: %s", regel)
+		if len(match) > 0 {
+			returncode = returncode + 1
+		}
+	}
+	return returncode, scanner.Err()
+}
+
 func main() {
 	cronjobs := make(map[string]int)
 	cronjobs["etl_status"] = 0
@@ -47,114 +74,95 @@ func main() {
 	cronjobs["backupportainer_status"] = 0
 	os.MkdirAll("/home/ubuntu/jobstatus/metrics", 0755)
 
+	//	   ### ETL job
+
+	// Check if etl-log is up-to-date
+	var (
+		fileInfo os.FileInfo
+		err      error
+	)
+	fileInfo, err = os.Stat("/home/ubuntu/etl.log")
+	if err != nil {
+		log.Fatal(err)
+	}
+	modTime := fileInfo.ModTime()
+	curTime := time.Now()
+	diff := curTime.Sub(modTime)
+	var matches int
+	if diff == (time.Duration(720) * time.Minute) {
+		fmt.Println("etl.log is older than 12 hours ", diff)
+	} else {
+		fmt.Println("etl.log is newer than 12 hours ", diff)
+		// it is recent enough; let's check for expected lines
+		matches, err = miniGrep("/home/ubuntu/etl.log", "Estimated remaining time: 0 m.*recommendations")
+		if err != nil {
+			log.Fatal(err)
+		}
+		if matches > 0 {
+			log.Printf("%d matches found!\n", matches)
+			// looking good so far. Let's check for Python traceback messages too
+			matches, err = miniGrep("/home/ubuntu/etl.log", "traceback")
+			if err != nil {
+				log.Fatal(err)
+			}
+			if matches > 0 {
+				log.Printf("%d traceback messages found. Not good.\n", matches)
+			} else {
+				cronjobs["etl_status"] = 1
+				log.Printf("No traceback messages found. Looks okay.\n")
+			}
+		}
+	}
+
+	// Check portainer backup
+
+	fileInfo, err = os.Stat("/tmp/backupportainer.log")
+	if err != nil {
+		log.Fatal(err)
+	}
+	modTime = fileInfo.ModTime()
+	curTime = time.Now()
+	diff = curTime.Sub(modTime)
+	if diff == (time.Duration(720) * time.Minute) {
+		fmt.Println("Log is older than 12 hours ", diff)
+	} else {
+		fmt.Println("Log is newer than 12 hours ", diff)
+		// it is recent enough; let's check for expected lines
+		matches, err = miniGrep("/tmp/backupportainer.log", "Backup succeeded")
+		if err != nil {
+			log.Fatal(err)
+		}
+		if matches > 0 {
+			log.Printf("%d matches found!\n", matches)
+			cronjobs["backupportainer_status"] = 1
+			log.Printf("Portainer backup looks okay.\n")
+		}
+	}
+
+	// Check swarm backup
+
+	fileInfo, err = os.Stat("/tmp/backupswarm.log")
+	if err != nil {
+		log.Fatal(err)
+	}
+	modTime = fileInfo.ModTime()
+	curTime = time.Now()
+	diff = curTime.Sub(modTime)
+	if diff == (time.Duration(720) * time.Minute) {
+		fmt.Println("Log is older than 12 hours ", diff)
+	} else {
+		fmt.Println("Log is newer than 12 hours ", diff)
+		// it is recent enough; let's check for expected lines
+		matches, err = miniGrep("/tmp/backupswarm.log", "Backup succeeded")
+		if err != nil {
+			log.Fatal(err)
+		}
+		if matches > 0 {
+			log.Printf("%d matches found!\n", matches)
+			cronjobs["backupswarm_status"] = 1
+			log.Printf("Swarm backup looks okay.\n")
+		}
+	}
+	// Save the findings
 	writestatus(cronjobs)
-	/*
-	   ### ETL job
-
-	   SUCCESS=0
-
-	   # Check if etl-log is up-to-date
-
-	   if [ `find "/home/ubuntu/etl.log" -mmin +720` ]
-	   then
-	       # file is more than 12 hours old and therefore not up-to-date
-	       SUCCESS=0
-	   else
-	      tail -100 /home/ubuntu/etl.log | grep "Estimated remaining time: 0 m.*recommendations" >/dev/null 2>&1
-	      if [ $? -eq 0 ]
-	      then
-	        # We found the line. Indicates successful end
-	        # Let's double-check for errors
-	        grep -i traceback /home/ubuntu/etl.log >/dev/null 2>&1
-	        if [ $? -ne 1 ]
-	        then
-	          # We found a traceback message. indicating failure
-	          SUCCESS=0
-	        else
-	          SUCCESS=1
-	        fi
-	      else
-	        SUCCESS=0
-	      fi
-	   fi
-
-	   # Write it to file to serve
-
-	   if [ $SUCCESS -eq 1 ]
-	   then
-	     # All good
-	     setstatus_ok etl_status
-	   else
-	     # Bad stuff has happened
-	     setstatus_ko etl_status
-	   fi
-
-
-	   ### END ETL job
-
-	   ### Swarm metadata backup
-	   SUCCESS=0
-	   # Check if backup-log is up-to-date
-
-	   if [ `find "/tmp/backupswarm.log" -mmin +720` ]
-	   then
-	       # file is more than 12 hours old and therefore not up-to-date
-	       SUCCESS=0
-	   else
-	      grep "Backup succeeded" /tmp/backupswarm.log >/dev/null 2>&1
-	      if [ $? -eq 0 ]
-	      then
-	        # We found the line. Indicates successful end
-	        SUCCESS=1
-	      else
-	        SUCCESS=0
-	      fi
-	   fi
-
-	   # Write it to file to serve
-
-	   if [ $SUCCESS -eq 1 ]
-	   then
-	     # All good
-	     setstatus_ok backupswarm_status
-	   else
-	     # Bad stuff has happened
-	     setstatus_ko backupswarm_status
-	   fi
-
-	   ### END swarm metadata backup
-
-
-	   ### Portainer metadata backup
-	   SUCCESS=0
-	   # Check if backup-log is up-to-date
-
-	   if [ `find "/tmp/backupportainer.log" -mmin +720` ]
-	   then
-	       # file is more than 12 hours old and therefore not up-to-date
-	       SUCCESS=0
-	   else
-	      grep "Backup succeeded" /tmp/backupportainer.log >/dev/null 2>&1
-	      if [ $? -eq 0 ]
-	      then
-	        # We found the line. Indicates successful end
-	        SUCCESS=1
-	      else
-	        SUCCESS=0
-	      fi
-	   fi
-
-	   # Write it to file to serve
-
-	   if [ $SUCCESS -eq 1 ]
-	   then
-	     # All good
-	     setstatus_ok backupportainer_status
-	   else
-	     # Bad stuff has happened
-	     setstatus_ko backupportainer_status
-	   fi
-
-	   ### END portainer metadata backup
-	*/
 }

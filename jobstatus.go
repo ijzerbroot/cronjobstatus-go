@@ -33,7 +33,6 @@ func writestatus(cronjobs map[string]int) {
 
 	// Write map to buffer
 	for key, value := range cronjobs {
-		fmt.Println("%s %i\n", key, value)
 		len, err := htmlFile.WriteString(fmt.Sprintf("%s %d\n", key, value))
 		if err != nil {
 			log.Fatal(err)
@@ -59,7 +58,6 @@ func miniGrep(path string, searchtext string) (int, error) {
 	re := regexp.MustCompile(searchtext)
 	for _, regel := range lines {
 		match := re.FindString(regel)
-		// fmt.Println("Regel is: %s", regel)
 		if len(match) > 0 {
 			returncode = returncode + 1
 		}

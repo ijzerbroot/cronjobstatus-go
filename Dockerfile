@@ -3,7 +3,7 @@ FROM ubuntu:xenial
 
 RUN mkdir /home/ubuntu
 
-ADD jobstatus /jobstatus
+ADD cronjobstatus-go_linux_amd64 /jobstatus
 ADD entrypoint.sh /entrypoint.sh
 
 ADD test/etl.log /home/ubuntu/etl.log

@@ -10,13 +10,10 @@ import (
 )
 
 //
-// This script is to be placed on the swarm manager in /home/ubuntu/scripts
+// The compiled version of this program is to be placed on the swarm manager in /home/ubuntu/scripts
 //
 // it must then  be placed in cron to run after all jobs should have completed.
-// for example: 1 6 * * * /home/ubuntu/scripts/jobstatus.sh >/dev/null 2>&1
-
-// setup-work in case it is required
-// mkdir -p /home/ubuntu/jobstatus/metrics >/dev/null 2>&1
+// for example: 21 6 * * * /home/ubuntu/scripts/jobstatus >/dev/null 2>&1
 
 var htmlFile *os.File
 var err error

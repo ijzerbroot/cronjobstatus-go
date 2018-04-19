@@ -23,6 +23,7 @@ var err error
 var cronjobs map[string]int
 var bytesWritten int
 var regel string
+var logToCheck string
 
 func writestatus(cronjobs map[string]int) {
 	htmlFile, err := os.Create("/home/ubuntu/jobstatus/metrics/index.html")
@@ -78,7 +79,8 @@ func main() {
 		fileInfo os.FileInfo
 		err      error
 	)
-	fileInfo, err = os.Stat("/home/ubuntu/etl.log")
+	logToCheck = "/home/ubuntu/etl.log"
+	fileInfo, err = os.Stat(logToCheck)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -86,19 +88,19 @@ func main() {
 	curTime := time.Now()
 	diff := curTime.Sub(modTime)
 	var matches int
-	if diff == (time.Duration(720) * time.Minute) {
-		fmt.Println("etl.log is older than 12 hours ", diff)
+	if diff > (time.Duration(720) * time.Minute) {
+		fmt.Printf("%s is older than 12 hours (%s)\n", logToCheck, diff)
 	} else {
-		fmt.Println("etl.log is newer than 12 hours ", diff)
+		fmt.Printf("%s is newer than 12 hours (%s)\n", logToCheck, diff)
 		// it is recent enough; let's check for expected lines
-		matches, err = miniGrep("/home/ubuntu/etl.log", "Estimated remaining time: 0 m.*recommendations")
+		matches, err = miniGrep(logToCheck, "Estimated remaining time: 0 m.*recommendations")
 		if err != nil {
 			log.Fatal(err)
 		}
 		if matches > 0 {
 			log.Printf("%d matches found!\n", matches)
 			// looking good so far. Let's check for Python traceback messages too
-			matches, err = miniGrep("/home/ubuntu/etl.log", "traceback")
+			matches, err = miniGrep(logToCheck, "traceback")
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -112,20 +114,20 @@ func main() {
 	}
 
 	// Check portainer backup
-
-	fileInfo, err = os.Stat("/tmp/backupportainer.log")
+	logToCheck = "/tmp/backupportainer.log"
+	fileInfo, err = os.Stat(logToCheck)
 	if err != nil {
 		log.Fatal(err)
 	}
 	modTime = fileInfo.ModTime()
 	curTime = time.Now()
 	diff = curTime.Sub(modTime)
-	if diff == (time.Duration(720) * time.Minute) {
-		fmt.Println("Log is older than 12 hours ", diff)
+	if diff > (time.Duration(720) * time.Minute) {
+		fmt.Printf("%s is older than 12 hours (%s)\n", logToCheck, diff)
 	} else {
-		fmt.Println("Log is newer than 12 hours ", diff)
+		fmt.Printf("%s is newer than 12 hours (%s)\n", logToCheck, diff)
 		// it is recent enough; let's check for expected lines
-		matches, err = miniGrep("/tmp/backupportainer.log", "Backup succeeded")
+		matches, err = miniGrep(logToCheck, "Backup succeeded")
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -138,19 +140,20 @@ func main() {
 
 	// Check swarm backup
 
-	fileInfo, err = os.Stat("/tmp/backupswarm.log")
+	logToCheck = "/tmp/backupswarm.log"
+	fileInfo, err = os.Stat(logToCheck)
 	if err != nil {
 		log.Fatal(err)
 	}
 	modTime = fileInfo.ModTime()
 	curTime = time.Now()
 	diff = curTime.Sub(modTime)
-	if diff == (time.Duration(720) * time.Minute) {
-		fmt.Println("Log is older than 12 hours ", diff)
+	if diff > (time.Duration(720) * time.Minute) {
+		fmt.Printf("%s is older than 12 hours (%s)\n", logToCheck, diff)
 	} else {
-		fmt.Println("Log is newer than 12 hours ", diff)
+		fmt.Printf("%s is newer than 12 hours (%s)\n", logToCheck, diff)
 		// it is recent enough; let's check for expected lines
-		matches, err = miniGrep("/tmp/backupswarm.log", "Backup succeeded")
+		matches, err = miniGrep(logToCheck, "Backup succeeded")
 		if err != nil {
 			log.Fatal(err)
 		}
